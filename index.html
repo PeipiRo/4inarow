@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connect 4</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--board-blue:#1a5fb4;--bg:#0d1b2a;--surface:#1b2838;--surface-light:#243447;--text:#e0e6ed;--text-dim:#8899aa;--yellow:#fdd835;--red:#ef4444;--accent:#38bdf8}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Outfit',system-ui,sans-serif;overflow:hidden}
+#app{display:flex;height:100vh}
+#sidebar{width:280px;min-width:280px;background:var(--surface);border-right:1px solid #2a3a4d;display:flex;flex-direction:column;padding:24px 20px;gap:16px;overflow-y:auto}
+#sidebar h1{font-size:1.6rem;font-weight:800;letter-spacing:-0.02em;background:linear-gradient(135deg,var(--yellow),var(--red));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.section-label{font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px}
+.setting-row{display:flex;align-items:center;justify-content:space-between;padding:4px 0}
+.setting-row label{font-size:.85rem;font-weight:600}
+.setting-row input,.setting-row select{width:72px;background:var(--bg);border:1px solid #2a3a4d;border-radius:6px;color:var(--text);font-family:inherit;font-size:.85rem;font-weight:600;padding:6px 10px;text-align:center;outline:none;transition:border-color .15s}
+.setting-row input:focus,.setting-row select:focus{border-color:var(--accent)}
+.setting-row select{width:120px;text-align:left;cursor:pointer}
+.setting-row select option{background:var(--bg)}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:4px 0}
+.toggle-row label{font-size:.85rem;font-weight:600}
+.toggle-switch{position:relative;width:40px;height:22px;cursor:pointer}
+.toggle-switch input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:#2a3a4d;border-radius:11px;transition:.2s}
+.toggle-slider::before{content:'';position:absolute;height:16px;width:16px;left:3px;bottom:3px;background:var(--text-dim);border-radius:50%;transition:.2s}
+.toggle-switch input:checked+.toggle-slider{background:var(--accent)}
+.toggle-switch input:checked+.toggle-slider::before{transform:translateX(18px);background:#fff}
+button{font-family:inherit;font-weight:700;font-size:.85rem;border:none;border-radius:8px;padding:10px 16px;cursor:pointer;transition:all .15s}
+#btn-new-game{background:linear-gradient(135deg,var(--yellow),#f9a825);color:#1a1a1a;width:100%;font-size:.95rem;padding:12px}
+#btn-new-game:hover{transform:translateY(-1px);box-shadow:0 4px 16px #fdd83544}
+#btn-undo{background:var(--surface-light);color:var(--text);width:100%}
+#btn-undo:hover{background:#2e4459}
+#btn-undo:disabled{opacity:.35;cursor:default;transform:none}
+.divider{border:none;border-top:1px solid #2a3a4d;margin:2px 0}
+#status-area{flex:1;display:flex;flex-direction:column;gap:8px}
+#turn-indicator{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface-light);border-radius:8px;font-weight:600;font-size:.9rem}
+#turn-dot{width:18px;height:18px;border-radius:50%;flex-shrink:0}
+#move-log-container{flex:1;min-height:0}
+#move-log-container .section-label{margin-bottom:4px}
+#move-log{font-size:.78rem;color:var(--text-dim);line-height:1.7;max-height:180px;overflow-y:auto;padding-right:4px}
+#move-log::-webkit-scrollbar{width:4px}
+#move-log::-webkit-scrollbar-track{background:transparent}
+#move-log::-webkit-scrollbar-thumb{background:#2a3a4d;border-radius:2px}
+.move-number{color:var(--text-dim);font-weight:600}
+.move-p1{color:var(--yellow);font-weight:600}
+.move-p2{color:var(--red);font-weight:600}
+#eval-display{font-size:.75rem;color:var(--text-dim);padding:4px 0}
+#game-area{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;position:relative}
+canvas{display:block;cursor:pointer;border-radius:12px}
+#thinking-overlay{position:absolute;top:12px;right:24px;background:var(--surface);border:1px solid #2a3a4d;border-radius:8px;padding:8px 16px;font-size:.8rem;font-weight:600;color:var(--accent);display:none;align-items:center;gap:8px}
+#thinking-overlay.visible{display:flex}
+.spinner{width:14px;height:14px;border:2px solid #2a3a4d;border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#win-banner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.9);background:var(--surface);border:2px solid #2a3a4d;border-radius:16px;padding:32px 48px;text-align:center;opacity:0;pointer-events:none;transition:all .3s ease-out;z-index:10}
+#win-banner.visible{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto}
+#win-banner h2{font-size:1.8rem;font-weight:800;margin-bottom:8px}
+#win-banner p{color:var(--text-dim);font-size:.9rem;margin-bottom:16px}
+#btn-play-again{background:linear-gradient(135deg,var(--accent),#0ea5e9);color:#fff;padding:10px 28px;font-size:.9rem}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <h1>4 in a row</h1>
+    <div>
+      <div class="section-label">Board</div>
+      <div class="setting-row"><label for="set-cols">Columns</label><input type="number" id="set-cols" min="4" max="13" value="11"></div>
+      <div class="setting-row"><label for="set-rows">Rows</label><input type="number" id="set-rows" min="4" max="9" value="7"></div>
+    </div>
+    <div>
+      <div class="section-label">Engine</div>
+      <div class="setting-row"><label for="set-depth">Search depth</label><input type="number" id="set-depth" min="1" max="20" value="8"></div>
+      <div class="setting-row"><label for="set-time">Time limit (ms)</label><input type="number" id="set-time" min="500" max="30000" step="500" value="5000"></div>
+    </div>
+    <div>
+      <div class="section-label">Players</div>
+      <div class="setting-row"><label for="set-p1">Yellow (P1)</label><select id="set-p1"><option value="human">Human</option><option value="ai">AI</option></select></div>
+      <div class="setting-row"><label for="set-p2">Red (P2)</label><select id="set-p2"><option value="human">Human</option><option value="ai" selected>AI</option></select></div>
+    </div>
+    <div>
+      <div class="section-label">Debug</div>
+      <div class="toggle-row"><label>Show field values</label><label class="toggle-switch"><input type="checkbox" id="set-debug"><span class="toggle-slider"></span></label></div>
+    </div>
+    <button id="btn-new-game">New Game</button>
+    <button id="btn-undo">Undo Move</button>
+    <hr class="divider">
+    <div id="status-area">
+      <div id="turn-indicator"><div id="turn-dot"></div><span id="turn-text">Yellow's turn</span></div>
+      <div id="eval-display"></div>
+      <div id="move-log-container"><div class="section-label">Moves</div><div id="move-log"></div></div>
+    </div>
+  </div>
+  <div id="game-area">
+    <canvas id="board-canvas"></canvas>
+    <div id="thinking-overlay"><div class="spinner"></div><span>Thinking…</span></div>
+    <div id="win-banner"><h2 id="win-text"></h2><p id="win-sub"></p><button id="btn-play-again">Play Again</button></div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- ENGINE WEB WORKER                                            -->
+<!-- ============================================================ -->
+<script id="worker-src" type="text/js-worker">
+"use strict";
+
+const W = {
+  four_in_a_row: 100000, field_w1: 0, field_w2: 100, field_w3: 500, field_w4: 2500,
+  immediate_threat: 500, stacked_threats: 10000, fork_bonus: 20000,
+  vert_discount_pct: 50, center_weight: 15, parity_weight: 50
+};
+
+// Dual Zobrist tables — two independent 32-bit hashes act as a
+// pseudo-64-bit hash, virtually eliminating TT collisions.
+const Z_LO = new Uint32Array(2 * 13 * 10);
+const Z_HI = new Uint32Array(2 * 13 * 10);
+{
+  let s1 = 123456789, s2 = 987654321;
+  for (let i = 0; i < Z_LO.length; i++) {
+    s1 ^= s1 << 13; s1 ^= s1 >>> 17; s1 ^= s1 << 5; Z_LO[i] = s1 >>> 0;
+    s2 ^= s2 << 13; s2 ^= s2 >>> 17; s2 ^= s2 << 5; Z_HI[i] = s2 >>> 0;
+  }
+}
+
+class Board {
+  constructor(cols, rows) {
+    this.cols = cols; this.rows = rows; this.stride = rows + 1;
+    this.grid = new Int8Array(cols * this.stride);
+    this.height = new Int8Array(cols);
+    this.ply = 0; this.movesMade = 0; this.hashLo = 0; this.hashHi = 0;
+    this.hist = [];
+  }
+  cell(c, r) { return this.grid[c * this.stride + r]; }
+  setCell(c, r, v) { this.grid[c * this.stride + r] = v; }
+  move(col) {
+    const r = this.height[col]; if (r >= this.rows) return false;
+    this.setCell(col, r, this.ply + 1);
+    const zi = this.ply * 130 + col * 10 + r;
+    this.hashLo = (this.hashLo ^ Z_LO[zi]) >>> 0;
+    this.hashHi = (this.hashHi ^ Z_HI[zi]) >>> 0;
+    this.height[col]++; this.hist.push(col); this.ply ^= 1; this.movesMade++;
+    return true;
+  }
+  undoMove(col) {
+    this.height[col]--; const r = this.height[col]; const p = this.cell(col, r);
+    this.setCell(col, r, 0);
+    const zi = (p - 1) * 130 + col * 10 + r;
+    this.hashLo = (this.hashLo ^ Z_LO[zi]) >>> 0;
+    this.hashHi = (this.hashHi ^ Z_HI[zi]) >>> 0;
+    this.ply ^= 1; this.movesMade--; this.hist.pop();
+  }
+  isWin() {
+    if (!this.movesMade) return false;
+    const c = this.hist[this.hist.length - 1], r = this.height[c] - 1;
+    return this._chk(c, r);
+  }
+  _chk(c, r) {
+    const p = this.cell(c, r); if (!p) return false;
+    const DC = [1,0,1,1], DR = [0,1,1,-1];
+    for (let d = 0; d < 4; d++) {
+      let n = 1;
+      for (let s=1;s<=3;s++){const a=c+s*DC[d],b=r+s*DR[d];if(a<0||a>=this.cols||b<0||b>=this.rows||this.cell(a,b)!==p)break;n++;}
+      for (let s=1;s<=3;s++){const a=c-s*DC[d],b=r-s*DR[d];if(a<0||a>=this.cols||b<0||b>=this.rows||this.cell(a,b)!==p)break;n++;}
+      if (n >= 4) return true;
+    }
+    return false;
+  }
+  isDraw() { return this.movesMade >= this.cols * this.rows; }
+  wouldWin(col) {
+    if (this.height[col] >= this.rows) return false;
+    const r = this.height[col], p = this.ply + 1;
+    this.setCell(col, r, p); const w = this._chk(col, r); this.setCell(col, r, 0); return w;
+  }
+  getValidMoves() {
+    const mid = this.cols >> 1, m = [];
+    for (let d = 0; d <= mid; d++) {
+      const c1 = mid-d, c2 = mid+d;
+      if (c1>=0&&c1<this.cols&&this.height[c1]<this.rows) m.push(c1);
+      if (d>0&&c2>=0&&c2<this.cols&&this.height[c2]<this.rows) m.push(c2);
+    }
+    return m;
+  }
+  // Returns { score, valNv: [p1_array, p2_array] | null, rows, cols }
+  // valNv arrays are always indexed as [0]=P1(Yellow), [1]=P2(Red).
+  evaluateWithFV() {
+    const P_ME = this.ply, ME = P_ME+1, OPP = (P_ME^1)+1;
+    const cols = this.cols, rows = this.rows;
+    if (this.movesMade > 0 && this.isWin())
+      return { score: -W.four_in_a_row, valNv: null, rows, cols };
+    const val = [new Int8Array(cols*rows), new Int8Array(cols*rows)];
+    const valNv = [new Int8Array(cols*rows), new Int8Array(cols*rows)];
+    const idx = (c, r) => c * rows + r;
+    const DC=[1,0,1,1], DR=[0,1,1,-1];
+    for (let dir=0;dir<4;dir++){const dc=DC[dir],dr=DR[dir],isV=dir===1;
+      for(let c=0;c<cols;c++) for(let r=0;r<rows;r++){
+        const ec=c+3*dc,er=r+3*dr;if(ec<0||ec>=cols||er<0||er>=rows)continue;
+        let my=0,opp=0;for(let i=0;i<4;i++){const v=this.cell(c+i*dc,r+i*dr);if(v===ME)my++;else if(v===OPP)opp++;}
+        for(let i=0;i<4;i++){const cc=c+i*dc,rr=r+i*dr;if(this.cell(cc,rr)!==0)continue;const k=idx(cc,rr);
+          if(opp===0){const fv=my+1;if(fv>val[0][k])val[0][k]=fv;if(!isV&&fv>valNv[0][k])valNv[0][k]=fv;}
+          if(my===0){const fv=opp+1;if(fv>val[1][k])val[1][k]=fv;if(!isV&&fv>valNv[1][k])valNv[1][k]=fv;}}
+      }}
+    for(let c=0;c<cols;c++){let dead=false;for(let r=0;r<rows;r++){const k=idx(c,r);
+      if(dead){val[0][k]=0;val[1][k]=0;valNv[0][k]=0;valNv[1][k]=0;}if(val[0][k]>=4&&val[1][k]>=4)dead=true;}}
+    const fw=[0,W.field_w1,W.field_w2,W.field_w3,W.field_w4];let score=0;let myIC=0,oppIC=0;
+    for(let c=0;c<cols;c++){let myPR=-2,oppPR=-2,myS=false,oppS=false,myI=false,oppI=false;
+      for(let r=0;r<rows;r++){if(this.cell(c,r)!==0)continue;const k=idx(c,r);
+        const mv=val[0][k];if(mv>0&&mv<=4){const nv=valNv[0][k];let w;if(mv<=nv)w=fw[mv];else{const a=nv>0?fw[nv]:0,b=(fw[mv]*W.vert_discount_pct/100)|0;w=a>b?a:b;}score+=w;
+          if(mv>=4){if(r===myPR+1)myS=true;myPR=r;if(r===this.height[c]){score+=W.immediate_threat;myI=true;}if((r&1)===(P_ME===0?0:1))score+=W.parity_weight;}}
+        const ov=val[1][k];if(ov>0&&ov<=4){const nv=valNv[1][k];let w;if(ov<=nv)w=fw[ov];else{const a=nv>0?fw[nv]:0,b=(fw[ov]*W.vert_discount_pct/100)|0;w=a>b?a:b;}score-=w;
+          if(ov>=4){if(r===oppPR+1)oppS=true;oppPR=r;if(r===this.height[c]){score-=W.immediate_threat;oppI=true;}if((r&1)===((P_ME^1)===0?0:1))score-=W.parity_weight;}}}
+      if(myS)score+=W.stacked_threats;if(oppS)score-=W.stacked_threats;if(myI)myIC++;if(oppI)oppIC++;}
+    if(myIC>=2)score+=W.fork_bonus;if(oppIC>=2)score-=W.fork_bonus;
+    const mid=cols>>1;for(let c=0;c<cols;c++){const b=(mid-Math.abs(c-mid)+1)*W.center_weight;for(let r=0;r<this.height[c];r++){if(this.cell(c,r)===ME)score+=b;else score-=b;}}
+    // Map internal [ME, OPP] to fixed [P1, P2] for UI
+    const meIsP1 = (P_ME === 0);
+    const nvP1 = meIsP1 ? Array.from(valNv[0]) : Array.from(valNv[1]);
+    const nvP2 = meIsP1 ? Array.from(valNv[1]) : Array.from(valNv[0]);
+    return { score, valNv: [nvP1, nvP2], rows, cols };
+  }
+  evaluate() { return this.evaluateWithFV().score; }
+}
+
+// ---- Engine: Alpha-beta with iterative deepening, PVS, TT, LMR, forced extensions ----
+// Null move pruning deliberately omitted — unreliable in 4 in a row because
+// "passing" is not a legal move and flipping ply corrupts tactical analysis.
+const INF=1000000, WIN_SCORE=100000, MAX_EXT=4;
+const TT_SIZE=1<<20, TT_MASK=TT_SIZE-1, EXACT=0, LOWER=1, UPPER=2;
+const ttHLo=new Uint32Array(TT_SIZE); const ttHHi=new Uint32Array(TT_SIZE);
+const ttDepth=new Int8Array(TT_SIZE); const ttScore=new Int32Array(TT_SIZE);
+const ttFlag=new Int8Array(TT_SIZE); const ttMove=new Int8Array(TT_SIZE);
+function clearTT(){ttHLo.fill(0xFFFFFFFF);ttHHi.fill(0xFFFFFFFF);ttDepth.fill(-1);ttMove.fill(-1);}
+clearTT();
+const killers=new Array(128);for(let i=0;i<128;i++)killers[i]=[-1,-1];
+const hh=[new Int32Array(13),new Int32Array(13)];
+let nodes=0,depthR=0,bestScoreG=0,timeUp=false,timeLim=0,startT=0;
+
+function checkTime(){if(timeLim<=0)return false;if((nodes&4095)===0){if(performance.now()-startT>=timeLim)timeUp=true;}return timeUp;}
+
+function orderMoves(board,moves,ply){
+  const player=board.ply,mid=board.cols>>1;let ttBest=-1;
+  const h=board.hashLo&TT_MASK;if(ttHLo[h]===board.hashLo&&ttHHi[h]===board.hashHi)ttBest=ttMove[h];
+  const sc=new Int32Array(moves.length);
+  for(let i=0;i<moves.length;i++){const col=moves[i];let s=0;
+    if(col===ttBest)s+=1000000;if(board.wouldWin(col))s+=500000;
+    if(ply<128){if(col===killers[ply][0])s+=10000;else if(col===killers[ply][1])s+=9000;}
+    s+=hh[player][col];s+=(mid-Math.abs(col-mid))*10;sc[i]=s;}
+  for(let i=1;i<moves.length;i++){const km=moves[i],ks=sc[i];let j=i-1;
+    while(j>=0&&sc[j]<ks){moves[j+1]=moves[j];sc[j+1]=sc[j];j--;}moves[j+1]=km;sc[j+1]=ks;}
+}
+
+function negamax(board,depth,alpha,beta,extensions){
+  nodes++;if(checkTime())return 0;
+  if(board.isWin())return -(WIN_SCORE+depth);
+  if(board.isDraw())return 0;
+  // Forced move extension at leaf
+  if(depth<=0){
+    if(extensions<MAX_EXT){const mvs=board.getValidMoves();let forced=false;
+      if(mvs.length===1)forced=true;
+      if(!forced&&mvs.length>1){let bl=0;for(const m of mvs){board.move(m);let ow=false;
+        const om=board.getValidMoves();for(const o of om){if(board.wouldWin(o)){ow=true;break;}}
+        board.undoMove(m);if(!ow)bl++;}if(bl===1)forced=true;}
+      if(forced){depth=2;extensions++;}}
+    if(depth<=0)return board.evaluate();}
+  // TT probe — dual-hash verification
+  const ttIdx=board.hashLo&TT_MASK;
+  if(ttHLo[ttIdx]===board.hashLo&&ttHHi[ttIdx]===board.hashHi&&ttDepth[ttIdx]>=depth){
+    if(ttFlag[ttIdx]===EXACT)return ttScore[ttIdx];
+    if(ttFlag[ttIdx]===LOWER)alpha=Math.max(alpha,ttScore[ttIdx]);
+    if(ttFlag[ttIdx]===UPPER)beta=Math.min(beta,ttScore[ttIdx]);
+    if(alpha>=beta)return ttScore[ttIdx];}
+  const moves=board.getValidMoves();if(!moves.length)return 0;
+  orderMoves(board,moves,board.movesMade);
+  const origAlpha=alpha;let best=-INF,bestCol=moves[0];
+  for(let i=0;i<moves.length;i++){const col=moves[i];board.move(col);let score;
+    if(i===0){score=-negamax(board,depth-1,-beta,-alpha,extensions);}
+    else{let red=0;if(i>=3&&depth>=3&&!board.isWin())red=1;
+      score=-negamax(board,depth-1-red,-alpha-1,-alpha,extensions);
+      if(score>alpha&&(score<beta||red>0)&&!timeUp)score=-negamax(board,depth-1,-beta,-alpha,extensions);}
+    board.undoMove(col);if(timeUp)return 0;
+    if(score>best){best=score;bestCol=col;}if(score>alpha)alpha=score;
+    if(alpha>=beta){const mp=board.movesMade;if(mp<128){if(col!==killers[mp][0]){killers[mp][1]=killers[mp][0];killers[mp][0]=col;}}hh[board.ply][col]+=depth*depth;break;}}
+  // TT store
+  if(ttDepth[ttIdx]<=depth){ttHLo[ttIdx]=board.hashLo;ttHHi[ttIdx]=board.hashHi;
+    ttDepth[ttIdx]=depth;ttScore[ttIdx]=best;ttMove[ttIdx]=bestCol;
+    if(best<=origAlpha)ttFlag[ttIdx]=UPPER;else if(best>=beta)ttFlag[ttIdx]=LOWER;else ttFlag[ttIdx]=EXACT;}
+  return best;
+}
+
+function findBestMove(board,maxDepth,tl){
+  startT=performance.now();timeLim=tl;timeUp=false;nodes=0;depthR=0;bestScoreG=0;
+  for(let p=0;p<2;p++)for(let c=0;c<13;c++)hh[p][c]>>=1;
+  let moves=board.getValidMoves();if(!moves.length)return-1;if(moves.length===1)return moves[0];
+  for(const m of moves)if(board.wouldWin(m)){bestScoreG=WIN_SCORE;return m;}
+  let bestMove=moves[0];
+  for(let d=1;d<=maxDepth;d++){
+    let alpha=-INF,beta=INF;if(d>=4){alpha=bestScoreG-50;beta=bestScoreG+50;}
+    let failed;do{failed=false;let bad=-INF,bmd=moves[0],ca=alpha;
+      orderMoves(board,moves,board.movesMade);
+      for(let i=0;i<moves.length;i++){board.move(moves[i]);let score;
+        if(i===0)score=-negamax(board,d-1,-beta,-ca,0);
+        else{score=-negamax(board,d-1,-ca-1,-ca,0);if(score>ca&&score<beta&&!timeUp)score=-negamax(board,d-1,-beta,-ca,0);}
+        board.undoMove(moves[i]);if(timeUp)break;if(score>bad){bad=score;bmd=moves[i];}if(score>ca)ca=score;if(ca>=beta)break;}
+      if(timeUp)break;if(d>=4){if(bad<=alpha){alpha=-INF;failed=true;}else if(bad>=beta){beta=INF;failed=true;}}
+      if(!failed||timeUp){bestMove=bmd;bestScoreG=bad;depthR=d;}}while(failed&&!timeUp);
+    if(timeUp)break;
+    const bi=moves.indexOf(bestMove);if(bi>0){moves.splice(bi,1);moves.unshift(bestMove);}
+    if(bestScoreG>=WIN_SCORE-100||bestScoreG<=-WIN_SCORE+100)break;}
+  return bestMove;
+}
+
+// ---- Worker message handler ----
+self.onmessage = function(e) {
+  const { type, cols, rows, moves, depth, timeLimit } = e.data;
+  if (type === 'findMove') {
+    clearTT();
+    for(let i=0;i<128;i++)killers[i]=[-1,-1];
+    const board = new Board(cols, rows);
+    for (const m of moves) board.move(m);
+    const bestMove = findBestMove(board, depth, timeLimit);
+    self.postMessage({ type:'moveFound', move:bestMove, score:bestScoreG, depth:depthR, nodes, timeMs:performance.now()-startT });
+  } else if (type === 'getFieldValues') {
+    const board = new Board(cols, rows);
+    for (const m of moves) board.move(m);
+    const result = board.evaluateWithFV();
+    self.postMessage({ type:'fieldValues', valNv:result.valNv, rows:result.rows, cols:result.cols, score:result.score });
+  }
+};
+</script>
+
+<!-- ============================================================ -->
+<!-- UI CODE                                                      -->
+<!-- ============================================================ -->
+<script>
+"use strict";
+
+const workerSrc = document.getElementById('worker-src').textContent;
+const workerBlob = new Blob([workerSrc], { type: 'application/javascript' });
+const workerUrl = URL.createObjectURL(workerBlob);
+let worker = new Worker(workerUrl);
+
+const canvas = document.getElementById('board-canvas');
+const ctx = canvas.getContext('2d');
+const gameArea = document.getElementById('game-area');
+const thinkingOverlay = document.getElementById('thinking-overlay');
+const winBanner = document.getElementById('win-banner');
+const winText = document.getElementById('win-text');
+const winSub = document.getElementById('win-sub');
+const turnDot = document.getElementById('turn-dot');
+const turnTextEl = document.getElementById('turn-text');
+const evalDisplay = document.getElementById('eval-display');
+const moveLog = document.getElementById('move-log');
+const setCols = document.getElementById('set-cols');
+const setRows = document.getElementById('set-rows');
+const setDepth = document.getElementById('set-depth');
+const setTime = document.getElementById('set-time');
+const setP1 = document.getElementById('set-p1');
+const setP2 = document.getElementById('set-p2');
+const setDebug = document.getElementById('set-debug');
+
+let COLS=11,ROWS=7,DEPTH=8,TIME_LIMIT=5000;
+let grid=[],heights=[],moveHistory=[];
+let currentPlayer=1,gameOver=false,aiThinking=false;
+let playerTypes=[null,'human','ai'];
+let hoverCol=-1,lastAiInfo=null;
+let cellSize=0,boardX=0,boardY=0,pieceRadius=0,boardW=0,boardH=0,headerH=0;
+let dropAnimations=[],winCells=null,animFrame=null;
+let debugFV=null, showDebug=false;
+
+setDebug.addEventListener('change',()=>{
+  showDebug=setDebug.checked;
+  if(showDebug)requestFieldValues();else{debugFV=null;render();}
+});
+
+function initGame(){
+  COLS=Math.max(4,Math.min(13,parseInt(setCols.value)||11));
+  ROWS=Math.max(4,Math.min(9,parseInt(setRows.value)||7));
+  DEPTH=Math.max(1,Math.min(20,parseInt(setDepth.value)||8));
+  TIME_LIMIT=Math.max(500,Math.min(30000,parseInt(setTime.value)||5000));
+  playerTypes[1]=setP1.value;playerTypes[2]=setP2.value;
+  grid=[];heights=[];
+  for(let c=0;c<COLS;c++){grid[c]=new Int8Array(ROWS);heights[c]=0;}
+  moveHistory=[];currentPlayer=1;gameOver=false;aiThinking=false;
+  lastAiInfo=null;hoverCol=-1;dropAnimations=[];winCells=null;debugFV=null;
+  winBanner.classList.remove('visible');thinkingOverlay.classList.remove('visible');
+  worker.terminate();worker=new Worker(workerUrl);worker.onmessage=onWorkerMessage;
+  computeLayout();updateStatus();moveLog.innerHTML='';evalDisplay.textContent='';
+  if(showDebug)requestFieldValues();else render();
+  if(playerTypes[currentPlayer]==='ai')requestAiMove();
+}
+
+function computeLayout(){
+  const areaW=gameArea.clientWidth-48,areaH=gameArea.clientHeight-48;
+  headerH=50;const availH=areaH-headerH;
+  cellSize=Math.min(Math.floor(areaW/COLS),Math.floor(availH/ROWS));
+  cellSize=Math.max(cellSize,30);
+  pieceRadius=Math.floor(cellSize*0.4);
+  boardW=cellSize*COLS;boardH=cellSize*ROWS;
+  canvas.width=boardW;canvas.height=boardH+headerH;
+  boardX=0;boardY=headerH;
+}
+
+function render(){
+  const w=canvas.width,h=canvas.height;ctx.clearRect(0,0,w,h);
+  if(hoverCol>=0&&!gameOver&&!aiThinking&&playerTypes[currentPlayer]==='human'){
+    drawPiece(boardX+hoverCol*cellSize+cellSize/2,headerH/2,pieceRadius*0.85,currentPlayer,0.6);}
+  ctx.save();ctx.beginPath();roundRect(ctx,boardX,boardY,boardW,boardH,8);
+  ctx.fillStyle='#1a5fb4';ctx.fill();
+  const grad=ctx.createLinearGradient(boardX,boardY,boardX,boardY+boardH);
+  grad.addColorStop(0,'rgba(255,255,255,0.08)');grad.addColorStop(.5,'rgba(0,0,0,0)');grad.addColorStop(1,'rgba(0,0,0,0.15)');
+  ctx.fillStyle=grad;ctx.fill();ctx.restore();
+  for(let c=0;c<COLS;c++)for(let r=0;r<ROWS;r++){
+    const cx=boardX+c*cellSize+cellSize/2,cy=boardY+(ROWS-1-r)*cellSize+cellSize/2;
+    ctx.save();ctx.beginPath();ctx.arc(cx,cy,pieceRadius+2,0,Math.PI*2);ctx.fillStyle='rgba(0,0,0,0.35)';ctx.fill();ctx.restore();
+    const val=grid[c][r];
+    if(val===0){ctx.save();ctx.beginPath();ctx.arc(cx,cy,pieceRadius,0,Math.PI*2);ctx.fillStyle='#0d1b2a';ctx.fill();ctx.restore();}
+    else{let isW=false;if(winCells)for(const[wc,wr]of winCells)if(wc===c&&wr===r){isW=true;break;}drawPiece(cx,cy,pieceRadius,val,1.0,isW);}
+  }
+  for(const anim of dropAnimations){drawPiece(boardX+anim.col*cellSize+cellSize/2,anim.y,pieceRadius,anim.player,1.0);}
+  if(hoverCol>=0&&!gameOver&&!aiThinking&&playerTypes[currentPlayer]==='human'){
+    ctx.save();ctx.beginPath();roundRect(ctx,boardX+hoverCol*cellSize,boardY,cellSize,boardH,0);
+    ctx.fillStyle='rgba(255,255,255,0.06)';ctx.fill();ctx.restore();}
+  // Debug overlay: val_nv[P1], val_nv[P2] in each empty cell
+  if(showDebug&&debugFV&&debugFV.valNv){
+    const nv=debugFV.valNv,dRows=debugFV.rows,dCols=debugFV.cols;
+    ctx.save();
+    const fontSize=Math.max(8,Math.min(14,cellSize*0.22));
+    ctx.font=`bold ${fontSize}px 'Outfit',monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
+    for(let c=0;c<dCols&&c<COLS;c++)for(let r=0;r<dRows&&r<ROWS;r++){
+      if(grid[c][r]!==0)continue;
+      const k=c*dRows+r,v0=nv[0][k],v1=nv[1][k];
+      const cx=boardX+c*cellSize+cellSize/2,cy=boardY+(ROWS-1-r)*cellSize+cellSize/2;
+      ctx.fillStyle='rgba(0,0,0,0.6)';
+      const bw=cellSize*0.7,bh=fontSize*1.6;
+      ctx.fillRect(cx-bw/2,cy-bh/2,bw,bh);
+      ctx.fillStyle='#fdd835';ctx.fillText(v0,cx-cellSize*0.15,cy);
+      ctx.fillStyle='#ef4444';ctx.fillText(v1,cx+cellSize*0.15,cy);
+    }
+    ctx.restore();
+  }
+}
+
+function drawPiece(cx,cy,radius,player,alpha,glow){
+  ctx.save();ctx.globalAlpha=alpha;
+  const base=player===1?'#fdd835':'#ef4444',light=player===1?'#fff176':'#fca5a5',
+    dark=player===1?'#f9a825':'#dc2626',glowC=player===1?'rgba(253,216,53,0.5)':'rgba(239,68,68,0.5)';
+  if(glow){ctx.beginPath();ctx.arc(cx,cy,radius+6,0,Math.PI*2);ctx.fillStyle=glowC;ctx.fill();}
+  ctx.beginPath();ctx.arc(cx,cy,radius,0,Math.PI*2);
+  const g=ctx.createRadialGradient(cx-radius*.3,cy-radius*.3,radius*.1,cx,cy,radius);
+  g.addColorStop(0,light);g.addColorStop(.6,base);g.addColorStop(1,dark);ctx.fillStyle=g;ctx.fill();
+  ctx.beginPath();ctx.arc(cx,cy,radius,0,Math.PI*2);ctx.strokeStyle='rgba(0,0,0,0.2)';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.globalAlpha=1;ctx.restore();
+}
+
+function roundRect(ctx,x,y,w,h,r){ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+
+function animateDrop(col,row,player,onDone){
+  const targetY=boardY+(ROWS-1-row)*cellSize+cellSize/2;
+  const anim={col,row,player,y:boardY-cellSize/2,targetY,vy:0};
+  dropAnimations.push(anim);grid[col][row]=0;
+  function step(){anim.vy+=1.8;anim.y+=anim.vy;
+    if(anim.y>=anim.targetY){anim.y=anim.targetY;
+      if(anim.vy>3){anim.vy=-anim.vy*0.25;render();animFrame=requestAnimationFrame(step);return;}
+      dropAnimations.splice(dropAnimations.indexOf(anim),1);grid[col][row]=player;render();if(onDone)onDone();return;}
+    render();animFrame=requestAnimationFrame(step);}
+  animFrame=requestAnimationFrame(step);
+}
+
+function makeMove(col){
+  if(gameOver||aiThinking)return;if(col<0||col>=COLS||heights[col]>=ROWS)return;
+  const row=heights[col],player=currentPlayer;
+  heights[col]++;grid[col][row]=player;moveHistory.push(col);
+  currentPlayer=currentPlayer===1?2:1;logMove(col,player);
+  animateDrop(col,row,player,()=>{
+    if(checkWinAt(col,row,player)){gameOver=true;winCells=getWinCells(col,row,player);render();showWinBanner(player);return;}
+    if(moveHistory.length>=COLS*ROWS){gameOver=true;showDrawBanner();return;}
+    updateStatus();if(showDebug)requestFieldValues();
+    if(playerTypes[currentPlayer]==='ai')requestAiMove();});
+  updateStatus();
+}
+
+function checkWinAt(c,r,p){const DC=[1,0,1,1],DR=[0,1,1,-1];for(let d=0;d<4;d++){let cnt=1;for(let s=1;s<=3;s++){const cc=c+s*DC[d],rr=r+s*DR[d];if(cc<0||cc>=COLS||rr<0||rr>=ROWS||grid[cc][rr]!==p)break;cnt++;}for(let s=1;s<=3;s++){const cc=c-s*DC[d],rr=r-s*DR[d];if(cc<0||cc>=COLS||rr<0||rr>=ROWS||grid[cc][rr]!==p)break;cnt++;}if(cnt>=4)return true;}return false;}
+function getWinCells(c,r,p){const DC=[1,0,1,1],DR=[0,1,1,-1];for(let d=0;d<4;d++){const cells=[[c,r]];for(let s=1;s<=3;s++){const cc=c+s*DC[d],rr=r+s*DR[d];if(cc<0||cc>=COLS||rr<0||rr>=ROWS||grid[cc][rr]!==p)break;cells.push([cc,rr]);}for(let s=1;s<=3;s++){const cc=c-s*DC[d],rr=r-s*DR[d];if(cc<0||cc>=COLS||rr<0||rr>=ROWS||grid[cc][rr]!==p)break;cells.push([cc,rr]);}if(cells.length>=4)return cells;}return[[c,r]];}
+
+function undoMove(){
+  if(!moveHistory.length||gameOver||aiThinking)return;
+  const isVsAi=playerTypes[1]!==playerTypes[2];let n=isVsAi?2:1;n=Math.min(n,moveHistory.length);
+  for(let i=0;i<n;i++){const col=moveHistory.pop();heights[col]--;grid[col][heights[col]]=0;currentPlayer=currentPlayer===1?2:1;}
+  winCells=null;lastAiInfo=null;evalDisplay.textContent='';updateStatus();rebuildMoveLog();
+  if(showDebug)requestFieldValues();else render();
+}
+
+function requestAiMove(){if(gameOver)return;aiThinking=true;thinkingOverlay.classList.add('visible');updateStatus();
+  worker.postMessage({type:'findMove',cols:COLS,rows:ROWS,moves:moveHistory.slice(),depth:DEPTH,timeLimit:TIME_LIMIT});}
+function requestFieldValues(){worker.postMessage({type:'getFieldValues',cols:COLS,rows:ROWS,moves:moveHistory.slice()});}
+
+worker.onmessage=onWorkerMessage;
+function onWorkerMessage(e){
+  if(e.data.type==='moveFound'){aiThinking=false;thinkingOverlay.classList.remove('visible');lastAiInfo=e.data;
+    evalDisplay.textContent=`depth ${e.data.depth} · ${(e.data.nodes/1000).toFixed(0)}k nodes · ${(e.data.timeMs/1000).toFixed(1)}s · score ${e.data.score}`;
+    makeMove(e.data.move);
+  }else if(e.data.type==='fieldValues'){debugFV=e.data;render();}
+}
+
+function updateStatus(){
+  const nm={1:'Yellow',2:'Red'},co={1:'#fdd835',2:'#ef4444'};
+  if(gameOver){turnDot.style.background='#666';turnTextEl.textContent='Game over';}
+  else if(aiThinking){turnDot.style.background=co[currentPlayer];turnTextEl.textContent=`${nm[currentPlayer]} is thinking…`;}
+  else{turnDot.style.background=co[currentPlayer];const w=playerTypes[currentPlayer]==='human'?"your":"AI's";turnTextEl.textContent=`${nm[currentPlayer]}'s turn (${w})`;}
+  document.getElementById('btn-undo').disabled=!moveHistory.length||gameOver||aiThinking;
+}
+
+function logMove(col,player){
+  const n=moveHistory.length,pC=player===1?'move-p1':'move-p2',pN=player===1?'Y':'R';
+  let html='';if(player===1)html+=`<span class="move-number">${Math.ceil(n/2)}.</span> `;
+  html+=`<span class="${pC}">${pN}${col+1}</span> `;moveLog.innerHTML+=html;moveLog.scrollTop=moveLog.scrollHeight;
+}
+function rebuildMoveLog(){moveLog.innerHTML='';for(let i=0;i<moveHistory.length;i++){const p=(i%2===0)?1:2,col=moveHistory[i];
+  if(p===1)moveLog.innerHTML+=`<span class="move-number">${Math.ceil((i+1)/2)}.</span> `;
+  moveLog.innerHTML+=`<span class="${p===1?'move-p1':'move-p2'}">${p===1?'Y':'R'}${col+1}</span> `;}}
+
+function showWinBanner(p){winText.textContent=`${p===1?'Yellow':'Red'} Wins!`;winText.style.color=p===1?'#fdd835':'#ef4444';
+  winSub.textContent=`Game ended in ${moveHistory.length} moves`;winBanner.classList.add('visible');updateStatus();}
+function showDrawBanner(){winText.textContent='Draw!';winText.style.color='#8899aa';winSub.textContent='The board is full';winBanner.classList.add('visible');updateStatus();}
+
+canvas.addEventListener('mousemove',e=>{const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left;
+  const col=Math.floor((x-boardX)/cellSize);hoverCol=(col>=0&&col<COLS)?col:-1;render();});
+canvas.addEventListener('mouseleave',()=>{hoverCol=-1;render();});
+canvas.addEventListener('click',e=>{if(gameOver||aiThinking||playerTypes[currentPlayer]!=='human')return;
+  const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,col=Math.floor((x-boardX)/cellSize);
+  if(col>=0&&col<COLS&&heights[col]<ROWS)makeMove(col);});
+
+document.getElementById('btn-new-game').addEventListener('click',initGame);
+document.getElementById('btn-undo').addEventListener('click',undoMove);
+document.getElementById('btn-play-again').addEventListener('click',initGame);
+window.addEventListener('resize',()=>{computeLayout();render();});
+
+initGame();
+</script>
+</body>
+</html>
